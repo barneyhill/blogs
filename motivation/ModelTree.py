@@ -130,7 +130,7 @@ class ModelTree(object):
             no_children = node["children"]["left"] is None and \
                           node["children"]["right"] is None
             if no_children:
-                y_pred_x = node["model"].predict(np.array(x)abs)[0]
+                y_pred_x = node["model"].predict(np.array(x))[0]
                 return y_pred_x
             else:
                 if x[node["j_feature"]] <= node["threshold"]:  # x[j] < threshold
