@@ -19,6 +19,9 @@ class ModelTree(object):
         self.n_search_grid = n_search_grid
         self.tree = None
 
+    def get_tree(self):
+        return self.tree
+
     def get_params(self, deep=True):
         return {
             "model": self.model.get_params() if deep else self.model,
