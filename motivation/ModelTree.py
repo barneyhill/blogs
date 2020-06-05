@@ -5,22 +5,19 @@
 """
 import numpy as np
 from copy import deepcopy
+from graphviz import Digraph
 
 class ModelTree(object):
 
     def __init__(self, model, max_depth=5, min_samples_leaf=10,
                  search_type="greedy", n_search_grid=100):
 
-        self.name = 'Polynomial CART'
         self.model = model
         self.max_depth = max_depth
         self.min_samples_leaf = min_samples_leaf
         self.search_type = search_type
         self.n_search_grid = n_search_grid
         self.tree = None
-
-    def get_tree(self):
-        return self.tree
 
     def get_params(self, deep=True):
         return {
@@ -133,14 +130,14 @@ class ModelTree(object):
             no_children = node["children"]["left"] is None and \
                           node["children"]["right"] is None
             if no_children:
-                y_pred_x = node["model"].predict(np.array(x))[0]
+                y_pred_x = node["model"].predict([x])[0]
                 return y_pred_x
             else:
                 if x[node["j_feature"]] <= node["threshold"]:  # x[j] < threshold
                     return _predict(node["children"]["left"], x)
                 else:  # x[j] > threshold
                     return _predict(node["children"]["right"], x)
-        y_pred = np.array([_predict(self.tree, np.array(x)) for x in X])
+        y_pred = np.array([_predict(self.tree, x) for x in X])
         return y_pred
 
     # ======================
@@ -170,6 +167,84 @@ class ModelTree(object):
     def loss(self, X, y, y_pred):
         loss = self.model.loss(X, y, y_pred)
         return loss
+
+    # ======================
+    # Tree diagram
+    # ======================
+    def export_graphviz(self, output_filename, feature_names,
+                        export_png=True, export_pdf=False):
+        """
+         Assumes node structure of:
+
+           node["name"]
+           node["n_samples"]
+           node["children"]["left"]
+           node["children"]["right"]
+           node["j_feature"]
+           node["threshold"]
+           node["loss"]
+
+        """
+        g = Digraph('g', node_attr={'shape': 'record', 'height': '.1'})
+
+        def build_graphviz_recurse(node, parent_node_index=0, parent_depth=0, edge_label=""):
+
+            # Empty node
+            if node is None:
+                return
+
+            # Create node
+            node_index = node["index"]
+            if node["children"]["left"] is None and node["children"]["right"] is None:
+                threshold_str = ""
+            else:
+                threshold_str = "{} <= {:.1f}\\n".format(feature_names[node['j_feature']], node["threshold"])
+
+            label_str = "{} n_samples = {}\\n loss = {:.6f}".format(threshold_str, node["n_samples"], node["loss"])
+
+            # Create node
+            nodeshape = "rectangle"
+            bordercolor = "black"
+            fillcolor = "white"
+            fontcolor = "black"
+            g.attr('node', label=label_str, shape=nodeshape)
+            g.node('node{}'.format(node_index),
+                   color=bordercolor, style="filled",
+                   fillcolor=fillcolor, fontcolor=fontcolor)
+
+            # Create edge
+            if parent_depth > 0:
+                g.edge('node{}'.format(parent_node_index),
+                       'node{}'.format(node_index), label=edge_label)
+
+            # Traverse child or append leaf value
+            build_graphviz_recurse(node["children"]["left"],
+                                   parent_node_index=node_index,
+                                   parent_depth=parent_depth + 1,
+                                   edge_label="")
+            build_graphviz_recurse(node["children"]["right"],
+                                   parent_node_index=node_index,
+                                   parent_depth=parent_depth + 1,
+                                   edge_label="")
+
+        # Build graph
+        build_graphviz_recurse(self.tree,
+                               parent_node_index=0,
+                               parent_depth=0,
+                               edge_label="")
+
+        # Export pdf
+        if export_pdf:
+            print("Saving model tree diagram to '{}.pdf'...".format(output_filename))
+            g.format = "pdf"
+            g.render(filename=output_filename, view=False, cleanup=True)
+
+        # Export png
+        if export_png:
+            print("Saving model tree diagram to '{}.png'...".format(output_filename))
+            g.format = "png"
+            g.render(filename=output_filename, view=False, cleanup=True)
+
 
 # ***********************************
 #
@@ -274,4 +349,3 @@ def _split_data(j_feature, threshold, X, y):
     idx_right = np.delete(np.arange(0, len(X)), idx_left)
     assert len(idx_left) + len(idx_right) == len(X)
     return (X[idx_left], y[idx_left]), (X[idx_right], y[idx_right])
-
