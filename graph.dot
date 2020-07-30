@@ -1,0 +1,5 @@
+digraph g {
+	node [height=.1 shape=record]
+	node [label=" n_samples = 100\n loss = 0.525681" shape=rectangle]
+	node1 [color=black fillcolor=white fontcolor=black style=filled]
+}
